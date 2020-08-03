@@ -44,6 +44,7 @@ impl Emote {
         let body = match client.post(format!("https://{}/api/emotes", config.domain).as_str())
             .multipart(form)
             .send() {
+                Ok(ref res) if res.status() == StatusCode::BAD_REQUEST => return None,
                 Ok(res) => res,
                 Err(res) => panic!("Res was {:?}", res)
             };
