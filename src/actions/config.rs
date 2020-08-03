@@ -2,7 +2,7 @@ use crate::config::Config;
 use read_input::prelude::*;
 
 pub fn configure() {
-   
+    create();
 }
 
 pub fn create() -> Option<Config> {

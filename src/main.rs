@@ -30,6 +30,7 @@ fn main() {
 
         let action = &args[1];
         match action.as_str() {
+            "login" => actions::config::configure(),
             "emotes" => match args[2].as_str() {
                 "upload" => actions::emote::upload(config, &args[3], &args[4], &args[5]),
                 "delete" => actions::emote::delete(&args[3]),
@@ -79,6 +80,8 @@ That is a server-side bug right now, and it will be fixed later. So you must fir
                 println!("emotes namespace help");
                 println!("emotes emotes help");
                 println!("emotes user help");
+                println!("\nIf you entered the wrong api key/want to change it, try:\n");
+                println!("emotes login");
 
             }
             _ => println!("Invalid action `{}`. Try asking for help with `emotes help`?", action)
