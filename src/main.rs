@@ -3,9 +3,9 @@ extern crate keyring;
 extern crate json;
 
 use std::env;
-use emotes_uploader::types::namespace::Namespace;
-use emotes_uploader::config::Config;
-use emotes_uploader::actions;
+use emotes::types::namespace::Namespace;
+use emotes::config::Config;
+use emotes::actions;
 use std::io;
 use std::io::Read;
 use read_input::prelude::*;
