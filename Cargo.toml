@@ -1,5 +1,5 @@
 [package]
-name = "emotes_uploader"
+name = "emotes"
 version = "0.1.0"
 authors = ["Ramesh Balaji <post2rb@hotmail.com>"]
 edition = "2018"
