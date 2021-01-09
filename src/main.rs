@@ -13,16 +13,24 @@ use read_input::prelude::*;
 fn main() {
     let mut args: Vec<String> = env::args().collect();
 
-    let mut domain = input().msg("Your domain: ").get();
 
-    let config = match Config::from(domain) {
+    let config = match Config::from(None) {
         Some(config) => config,
         None => {
-            println!("Sorry, your domain doesn't exist. Let's create it.");
-            match actions::config::create() {
+            let mut domain = input().msg("Your domain: ").get();
+
+            let config = match Config::from(Some(domain)) {
                 Some(config) => config,
-                None => panic!("Couldn't create config. Something is probably wrong with your keychain setup.")
-            }
+                None => {
+                    println!("Sorry, your domain doesn't exist. Let's create it.");
+                    match actions::config::create() {
+                        Some(config) => config,
+                        None => panic!("Couldn't create config. Something is probably wrong with your keychain setup.")
+                    }
+                }
+            };
+
+            config
         }
     };
 

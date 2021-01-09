@@ -13,15 +13,34 @@ pub struct Config {
 
 impl Config {
 
-    pub fn from(domain: String) -> Option<Config> {
+    pub fn from(domain: Option<String>) -> Option<Config> {
         let service = "emotescli"; // TODO make this a constant
 
-        let keyring = keyring::Keyring::new(service, &domain);
-        let api_key = match keyring.get_password() {
+        if let Some(unwrap_domain) = domain {
+            return Self::from_domain(unwrap_domain);
+        }
+        else {
+            let default_domain = keyring::Keyring::new(service, "default");
+            let unwrap_domain = match default_domain.get_password() {
+                Ok(domain) => domain,
+                Err(er) => return None
+            };
+
+            return Self::from_domain(unwrap_domain);
+        }
+
+        None
+
+    }
+
+    fn from_domain(domain: String) -> Option<Config> {
+        let service = "emotescli"; // TODO make this a constant
+
+        let domain_key = keyring::Keyring::new(service, &domain);
+        let api_key = match domain_key.get_password() {
             Ok(key) => key,
             Err(er) => return None
         };
-
         Some(
             Config {
                 api_key: api_key,
@@ -35,6 +54,10 @@ impl Config {
 
         let keyring = keyring::Keyring::new(service, &domain);
         keyring.set_password(&api_key);
+
+        let default_keyring = keyring::Keyring::new(service, "default");
+        default_keyring.set_password(&domain);
+
 
         Some(
             Config {
