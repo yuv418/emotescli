@@ -19,10 +19,7 @@ impl Emote {
     pub fn upload(config: &Config, path: String, name: String, file_path: String) -> Option<Emote> {
         let apikey = config.api_key.clone();
         let namecopy = name.clone();
-        let namespace = match Namespace::from(config, path.clone()) {
-            Some(nmsp) => nmsp,
-            None => panic!("The namespace path you provided doesn't exist.")
-        };
+        let pathcopy = path.clone();
 
         let mime = mime_guess::from_path(&file_path);
         let mime = match mime.first() {
@@ -55,6 +52,10 @@ impl Emote {
             panic!("Error: {:?}", er);
         }
 
+        let namespace = match Namespace::from(config, pathcopy) {
+            Some(nmsp) => nmsp,
+            None => panic!("The namespace path you provided doesn't exist.")
+        };
 
         for emote in namespace.emotes {
             if emote.name == name {
@@ -63,6 +64,31 @@ impl Emote {
         }
 
         None
+
+    }
+
+    pub fn delete(config: &Config, path: String, name: String) -> Result<(), ()> {
+
+        let apikey = config.api_key.clone();
+        let form = multipart::Form::new()
+            .text("api_key", apikey)
+            .text("path", path)
+            .text("name", name);
+
+        let client = Client::new();
+        let body = match client.delete(format!("https://{}/api/emotes", config.domain).as_str())
+            .multipart(form)
+            .send() {
+                Ok(ref res) if res.status() == StatusCode::BAD_REQUEST => return Err(()),
+                Ok(res) => res,
+                Err(res) => panic!("Res was {:?}", res)
+            };
+
+        if let Err(er) = body.text() {
+            panic!("Error: {:?}", er);
+        }
+
+        Ok(())
 
     }
 }

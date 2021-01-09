@@ -10,6 +10,11 @@ pub fn upload(config: Config, path: &str, name: &str, file_path: &str) {
     println!("Created emote. Access it at https://{}/{}/{}.", &config.domain, path, new_emote.slug);
 }
 
-pub fn delete(path: &str) {
+pub fn delete(config: Config, path: &str, name: &str) {
+
+    let deleted_response = match Emote::delete(&config, path.to_string(), name.to_string()) {
+        Ok(ok) => println!("Deleted emote."),
+        Err(err) => panic!("Failed to delete emote! It is possible the emote doesn't exist/was already deleted.")
+    };
 
 }

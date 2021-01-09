@@ -41,11 +41,11 @@ fn main() {
             "login" => actions::config::configure(),
             "emotes" => match args[2].as_str() {
                 "upload" => actions::emote::upload(config, &args[3], &args[4], &args[5]),
-                "delete" => actions::emote::delete(&args[3]),
+                "delete" => actions::emote::delete(config, &args[3], &args[4]),
                 "help" => {
                     println!("\nTry:\n");
                     println!("emotes emotes upload NAMESPACE_PATH EMOTE_NAME EMOTE_PATH");
-                    println!("emotes emotes delete (unimplemented)");
+                    println!("emotes emotes delete NAMESPACE_PATH EMOTE_PATH");
                 }
                 _ => println!("Invalid emote action `{}`", args[2])
             }
