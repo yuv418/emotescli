@@ -1,6 +1,6 @@
 [package]
 name = "emotes"
-version = "0.1.0"
+version = "0.2.0"
 authors = ["Ramesh Balaji <post2rb@hotmail.com>"]
 license = "MIT"
 description = "Upload files to your emotes server of choice with this CLI tool."
