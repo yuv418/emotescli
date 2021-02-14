@@ -3,15 +3,62 @@ extern crate keyring;
 extern crate json;
 
 use std::env;
-use emotes::types::namespace::Namespace;
+// use emotes::types::namespace::Namespace;
 use emotes::config::Config;
-use emotes::actions;
+// use emotes::actions;
 use std::io;
 use std::io::Read;
 use read_input::prelude::*;
+use emotes::dispatcher::*;
+use emotes::types;
+use emotes::types::AddMultipartFiles;
+use reqwest::Method;
+use structopt::StructOpt;
+use serde::{Deserialize, Serialize};
+use std::path::PathBuf;
+use read_input::prelude::*;
+use emotes::actions::config;
+
+#[derive(StructOpt, Debug)]
+#[structopt(about = "emotes")]
+enum Opt {
+    Create {
+        #[structopt(subcommand)]
+        identifier: CreateResourceType,
+    },
+    Get {
+        #[structopt(subcommand)]
+        identifier: IdResourceType,
+    },
+    Delete {
+        #[structopt(subcommand)]
+        identifier: IdResourceType,
+    }
+}
+
+#[derive(Serialize, StructOpt, Debug)]
+enum IdResourceType {
+    Emote(IdEmote) , User(IdUser), Namespace(IdNamespace)
+}
+
+#[derive(Serialize, StructOpt, Debug)] struct IdEmote {path: String, name: String}
+#[derive(Serialize, StructOpt, Debug)] struct IdUser {
+    name: String,
+    #[structopt(skip)]
+    delete: String
+}
+#[derive(Serialize, StructOpt, Debug)] struct IdNamespace {name: String}
+
+#[derive(Serialize, StructOpt, Debug)]
+#[structopt(rename_all = "lower")]
+enum CreateResourceType {
+    Emote(types::Emote), User(types::User), ApiKey(IdUser), Namespace(types::Namespace)
+}
 
 fn main() {
-    let mut args: Vec<String> = env::args().collect();
+    let opt = Opt::from_args();
+    // println!("{:#?}", opt);
+
 
 
     let config = match Config::from(None) {
@@ -23,7 +70,7 @@ fn main() {
                 Some(config) => config,
                 None => {
                     println!("Sorry, your domain doesn't exist. Let's create it.");
-                    match actions::config::create() {
+                    match config::create() {
                         Some(config) => config,
                         None => panic!("Couldn't create config. Something is probably wrong with your keychain setup.")
                     }
@@ -34,72 +81,74 @@ fn main() {
         }
     };
 
-    if args.len() >= 2 {
-
-        let action = &args[1];
-        match action.as_str() {
-            "login" => actions::config::configure(),
-            "emotes" => match args[2].as_str() {
-                "upload" => actions::emote::upload(config, &args[3], &args[4], &args[5]),
-                "delete" => actions::emote::delete(config, &args[3], &args[4]),
-                "help" => {
-                    println!("\nTry:\n");
-                    println!("emotes emotes upload NAMESPACE_PATH EMOTE_NAME EMOTE_PATH");
-                    println!("emotes emotes delete NAMESPACE_PATH EMOTE_PATH");
+    let mut response: Option<types::Response> = None;
+    match opt {
+        Opt::Create { identifier } => {
+            match identifier {
+                CreateResourceType::User(user) => { // This has issues sometimes.
+                    response = Some(dispatch(&config, "/api/users", Method::POST, user).unwrap());
+                },
+                CreateResourceType::Namespace(namespace)  => {
+                    response = Some(dispatch(&config, "/api/namespaces/", Method::POST, namespace).unwrap());
+                }, // API Key?
+                CreateResourceType::Emote(emote) => {
+                    response = Some(dispatch_with_files(&config, "/api/emotes", Method::POST, emote).unwrap());
                 }
-                _ => println!("Invalid emote action `{}`", args[2])
+                CreateResourceType::ApiKey(user) => {
+                    response = Some(dispatch(&config, &format!("/api/users/{}/api_key", user.name), Method::POST, types::Blank).unwrap());
+                }
+                _ => println!("Not implemented"),
             }
-            "user" => match args[2].as_str() {
-                "create" => actions::user::create(&args[3]),
-                "key" => actions::user::key(&args[3]),
-                "delete" => actions::user::delete(&args[3]),
-                "help" => {
-                    println!("\nTry:\n");
-                    println!("emotes user create (unimplemented)");
-                    println!("emotes user key (unimplemented)");
-                    println!("emotes user delete (unimplemented)");
-                    println!("emotes user help (unimplemented)");
-                }
-                _ => println!("Invalid user action `{}`", args[2])
-            },
-            "namespace" => match args[2].as_str() {
-                "create" => actions::namespace::create(config, &args[3], &args[4]),
-                "delete" => actions::namespace::delete(args.remove(3)),
-                "view" => actions::namespace::view(config, &args[3]),
-                "help" => {
-                    println!("\nTry:\n");
-
-                    println!("emotes namespace create NAMESPACE_PATH NAME");
-                    println!("emotes namespace view NAMESPACE_PATH");
-
-                    println!(
-                        "\nThe namespace path (NAMESPACE_PATH) is important. Namespaces always have parent and child namespaces. \
-These are separated by slashes. Eg. the namespace test1 can have a child namespace test2, so if you're looking for the namespace test2 then you have to specify the NAMESPACE_PATH as \
-test1/test2. This also goes for creating emotes. However, when trying to create a namespace path, you **should not** create a namespace whose parent does not exist. \
-In that case, the server will silently create the parent namespace under the name for the child namespace. So if you try creating test1/test2 where test1 doesn't exist and specify the name \
-as \"Test 2,\" then you will get the namespace test1 UNDER the name \"Test 2\" AND the program will report that the namespace you tried to create was not created. Just don't do this for now.
-That is a server-side bug right now, and it will be fixed later. So you must first create test1 and then create test2. You cannot do both at once."
-                    );
-                }
-                _ => println!("Invalid namespace action `{}`", args[2])
-            },
-            "help" => {
-                println!("\nTry:\n");
-                println!("emotes namespace help");
-                println!("emotes emotes help");
-                println!("emotes user help");
-                println!("\nIf you entered the wrong api key/want to change it, try:\n");
-                println!("emotes login");
-
+        },
+        Opt::Get { identifier } => {
+            match &identifier {
+                IdResourceType::User ( IdUser { name, .. } ) => {
+                    let found_resource: types::User = dispatch(&config, "/api/users", Method::GET, name).unwrap();
+                    println!("{:#?}", found_resource);
+                },
+                IdResourceType::Namespace ( IdNamespace { name } ) => {
+                    let found_resource: types::Namespace = dispatch(&config, &("/api/namespaces/".to_owned() + name), Method::GET, types::Blank).unwrap();
+                    println!("{:#?}", found_resource);
+                },
+                _ => println!("Getting emotes is not supported at this time. If you want to view emotes, please view a namespace instead."),
             }
-            _ => println!("Invalid action `{}`. Try asking for help with `emotes help`?", action)
+        },
+        Opt::Delete { mut identifier } => { // TODO add a confirmation prompt for all of these
+            match identifier {
+                IdResourceType::User(ref mut user) => { // This doesn't work yet ( backend issue! ).
+                    let mut confirmation = false;
+                    let confirmation_str = input::<String>()
+                        .repeat_msg(format!("Are you SURE you want to delete user \"{}\"? There is no going back. (y/N) ", user.name))
+                        .default("n".to_owned())
+                        .add_test(|yn| yn == "n" || yn == "y")
+                        .get();
+
+                    if confirmation_str == "y" {
+                        user.delete = user.name.to_string();
+                        response = Some(dispatch(&config, "/api/users", Method::DELETE, user).unwrap()); // Undocumented API call... you need to inject a boolean as well
+                    }
+                    else {
+                        println!("Aborting."); // Will exit after this
+                    }
+
+                },
+                IdResourceType::Namespace ( IdNamespace { ref name } ) => {
+                    response = Some(dispatch(&config, &("/api/namespaces/".to_owned() + name), Method::DELETE, types::Blank).unwrap());
+                },
+                IdResourceType::Emote (ref emote) => {
+                    response = Some(dispatch(&config, "/api/emotes", Method::DELETE, emote).unwrap());
+                }
+                _ => println!("Delete not implemented for this type")
+            }
         }
+    };
+
+    if let Some(response_unwrap) = response {
+        println!("{}", response_unwrap);
+    }
+    //
 
 
-    }
-    else {
-        println!("No action specified. Try asking for help with `emotes help`?");
-    }
 
 }
 
